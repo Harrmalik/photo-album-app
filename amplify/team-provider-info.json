@@ -1,0 +1,19 @@
+{
+    "dev": {
+        "awscloudformation": {
+            "AuthRoleName": "photo-album-app-dev-20191020212357-authRole",
+            "UnauthRoleArn": "arn:aws:iam::353985006402:role/photo-album-app-dev-20191020212357-unauthRole",
+            "AuthRoleArn": "arn:aws:iam::353985006402:role/photo-album-app-dev-20191020212357-authRole",
+            "Region": "us-east-1",
+            "DeploymentBucketName": "photo-album-app-dev-20191020212357-deployment",
+            "UnauthRoleName": "photo-album-app-dev-20191020212357-unauthRole",
+            "StackName": "photo-album-app-dev-20191020212357",
+            "StackId": "arn:aws:cloudformation:us-east-1:353985006402:stack/photo-album-app-dev-20191020212357/d63b1690-f3a9-11e9-8cdc-12f81177eb92"
+        },
+        "categories": {
+            "auth": {
+                "photoalbumappb02238e8": {}
+            }
+        }
+    }
+}
