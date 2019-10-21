@@ -1,10 +1,122 @@
 import React, { Component } from 'react';
 import aws_exports from './aws-exports';
-import { withAuthenticator } from 'aws-amplify-react';
-import { Connect } from 'aws-amplify-react';
-import Amplify, { API, graphqlOperation } from 'aws-amplify';
-import { Grid, Header, Input, List, Segment } from 'semantic-ui-react';
+import Amplify, { API, graphqlOperation, Storage } from 'aws-amplify';
+import { Connect, S3Image, withAuthenticator } from 'aws-amplify-react';
+import { Divider, Form, Grid, Header, Input, List, Segment } from 'semantic-ui-react';
+import {BrowserRouter as Router, Route, NavLink} from 'react-router-dom';
+import {v4 as uuid} from 'uuid';
 Amplify.configure(aws_exports);
+
+
+// 3. NEW: Create an S3ImageUpload component
+class S3ImageUpload extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { uploading: false }
+  }
+  onChange = async (e) => {
+    const file = e.target.files[0];
+    const fileName = uuid();
+    this.setState({uploading: true});
+    const result = await Storage.put(
+      fileName,
+      file,
+      {
+        customPrefix: { public: 'uploads/' },
+        metadata: { albumid: this.props.albumId }
+      }
+    );
+    console.log('Uploaded file: ', result);
+    this.setState({uploading: false});
+  }
+  render() {
+    return (
+      <div>
+        <Form.Button
+          onClick={() => document.getElementById('add-image-file-input').click()}
+          disabled={this.state.uploading}
+          icon='file image outline'
+          content={ this.state.uploading ? 'Uploading...' : 'Add Image' }
+        />
+        <input
+          id='add-image-file-input'
+          type="file"
+          accept='image/*'
+          onChange={this.onChange}
+          style={{ display: 'none' }}
+        />
+      </div>
+    );
+  }
+}
+
+const GetAlbum = `query GetAlbum($id: ID!) {
+  getAlbum(id: $id) {
+    id
+    name
+    photos {
+      items {
+        thumbnail {
+          width
+          height
+          key
+        }
+      }
+      nextToken
+    }
+  }
+}
+`;
+
+class PhotosList extends React.Component {
+  photoItems() {
+    return this.props.photos.map(photo =>
+      <S3Image
+        key={photo.thumbnail.key}
+        imgKey={photo.thumbnail.key.replace('public/', '')}
+        style={{display: 'inline-block', 'paddingRight': '5px'}}
+      />
+    );
+  }
+  render() {
+    return (
+      <div>
+        <Divider hidden />
+        {this.photoItems()}
+      </div>
+    );
+  }
+}
+
+
+// 3. NEW: Create an AlbumDetailsLoader component
+//    to load the details for an album
+class AlbumDetailsLoader extends React.Component {
+  render() {
+    return (
+      <Connect query={graphqlOperation(GetAlbum, { id: this.props.id })}>
+        {({ data, loading, errors }) => {
+          if (loading) { return <div>Loading...</div>; }
+          if (errors.length > 0) { return <div>{JSON.stringify(errors)}</div>; }
+          if (!data.getAlbum) return;
+          return <AlbumDetails album={data.getAlbum} />;
+        }}
+      </Connect>
+    );
+  }
+}
+// 4. NEW: Create an AlbumDetails component
+class AlbumDetails extends Component {
+  render() {
+    return (
+      <Segment>
+        <Header as='h3'>{this.props.album.name}</Header>
+        <S3ImageUpload albumId={this.props.album.id}/>
+        <PhotosList photos={this.props.album.photos.items} />
+      </Segment>
+    )
+  }
+}
 
 // 2. NEW: Create a function we can use to
 //    sort an array of objects by a common property
@@ -27,11 +139,12 @@ function makeComparator(key, order='asc') {
 //    a sorted list of album names
 class AlbumsList extends React.Component {
   albumItems() {
-        return this.props.albums.sort(makeComparator('name')).map(album =>
-            <li key={album.id}>
-                {album.name}
-            </li>);
-    }
+    return this.props.albums.sort(makeComparator('name')).map(album =>
+      <List.Item key={album.id}>
+        <NavLink to={`/albums/${album.id}`}>{album.name}</NavLink>
+      </List.Item>
+    );
+  }
 
   render() {
     return (
@@ -156,14 +269,28 @@ class NewAlbum extends Component {
 // 6. EDIT: Change the App component to look nicer and
 //    use the AlbumsListLoader component
 class App extends Component {
+  // ...
+  // Leave other parts of the App component alone
+  // ...
+  // Replace the render() method with this version:
   render() {
     return (
-      <Grid padded>
-        <Grid.Column>
-          <NewAlbum />
-          <AlbumsListLoader />
-        </Grid.Column>
-      </Grid>
+      <Router>
+        <Grid padded>
+          <Grid.Column>
+            <Route path="/" exact component={NewAlbum}/>
+            <Route path="/" exact component={AlbumsListLoader}/>
+            <Route
+              path="/albums/:albumId"
+              render={ () => <div><NavLink to='/'>Back to Albums list</NavLink></div> }
+            />
+            <Route
+              path="/albums/:albumId"
+              render={ props => <AlbumDetailsLoader id={props.match.params.albumId}/> }
+            />
+          </Grid.Column>
+        </Grid>
+      </Router>
     );
   }
 }
